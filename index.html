@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<title>Kalender & Absensi Lengkap</title>
+<style>
+  body{margin:0;font-family:"Segoe UI",sans-serif;background:linear-gradient(135deg,#74ABE2,#5563DE);color:#fff;text-align:center}
+  h1,h2{margin:20px 0}
+  .calendar{display:inline-block;background:rgba(255,255,255,0.08);padding:20px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.25);min-width:320px}
+  table{width:100%;border-collapse:collapse;color:#fff}
+  th,td{padding:8px;border:1px solid rgba(255,255,255,0.12)}
+  th{background:rgba(255,255,255,0.06)}
+  td.holiday{background:#FF4C4C;color:#fff;border-radius:6px}
+  td.today{background:#FFD93D;color:#333;font-weight:bold;border-radius:6px}
+  .card{background:rgba(255,255,255,0.06);padding:18px;border-radius:12px;width:90%;margin:18px auto;box-shadow:0 6px 18px rgba(0,0,0,0.18)}
+  button{margin:6px;padding:10px 16px;border:none;border-radius:8px;cursor:pointer;background:#FFD93D;color:#333;font-weight:700}
+  button:hover{background:#FFC107}
+  #legend{margin:10px auto;width:90%;display:flex;justify-content:center;gap:16px;font-weight:700}
+  #legend div{display:flex;align-items:center;gap:6px}
+  input[type="number"]{width:120px;padding:8px;border-radius:6px;border:none}
+  input[type="file"]{margin-left:8px}
+  td.absent-weekend {
+  background: transparent;   /* biar ikuti bawaan body */
+  color:#FF4C4C;            /* teks tanggal Minggu merah */
+  font-weight: bold;         /* biar lebih jelas */
+}
+
+</style>
+</head>
+<body>
+  <h1>Kalender & Absensi</h1>
+
+  <div style="margin-bottom:12px;">
+    <button onclick="changeMonth(-1)">&lt; Sebelumnya</button>
+    <button onclick="changeMonth(1)">Berikutnya &gt;</button>
+  </div>
+
+  <div class="calendar" id="calendar"></div>
+
+<div id="legend">
+  <div><div style="width:18px;height:18px;background:#FF4C4C;border-radius:4px"></div> Libur Nasional</div>
+  <div><div style="width:18px;height:18px;border:2px solid #FF4C4C;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#FF4C4C">S</div> Minggu</div>
+  <div><div style="width:18px;height:18px;background:#FFD93D;border-radius:4px"></div> Hari Ini</div>
+</div>
+
+<div id="legend">
+  <div><span style="color:#FF4C4C;font-weight:700">✗</span> Tidak Hadir</div>
+  <div><span style="color:limegreen;font-weight:700">✓</span> Absen 8 Jam</div>
+  <div><span style="color:#FF9800;font-weight:700">🌇 ☑</span> Absen 12 Jam Shift Pagi</div>
+  <div><span style="color:#3F51B5;font-weight:700">🌃 ☑</span> Absen 12 Jam Shift Malam</div>
+</div>
+
+  </div>
+
+  <div class="card">
+    <h2>Absensi Pekerja</h2>
+    <div style="text-align:left;margin-bottom:14px;font-size:14px;line-height:1.5">
+      <strong>Keterangan:</strong>
+      <ul>
+        <li><b>Absen 8 Jam</b> = Absen kerja 8 jam harian</li>
+        <li><b>Tidak Hadir</b> = Tidak hadir (sakit/izin) — uang kerajinan hangus</li>
+        <li><b>Absen 12 Jam Shift Pagi</b> = Absen kerja 12 jam Shift Pagi</li>
+        <li><b>Absen 12 Jam Shift Malam</b> = Absen kerja 12 jam Shift Malam, extra tambahan Rp5.000</li>
+        <li><b>Lembur per jam</b> = Tambahan waktu kerja di luar 8 jam (Rp12.000/jam)</li>
+      </ul>
+    </div>
+
+    <div style="margin-bottom:8px;">
+      <button onclick="markAttendance()">Absen Hadir</button>
+      <button onclick="markAbsent()">Tidak Hadir</button>
+    </div>
+
+    <div style="margin-bottom:8px;">
+      <button onclick="markAttendance('ShiftPagi')">Absen 12 Jam Shift Pagi</button>
+      <button onclick="markAttendance('ShiftMalam')">Absen 12 Jam Shift Malam</button>
+    </div>
+
+    <div style="margin:8px 0;">
+      <input type="number" id="overtimeInput" min="0" placeholder="Jam Lembur">
+      <button onclick="addOvertime()">Tambahkan Lembur</button>
+    </div>
+
+    <div style="margin:8px 0;">
+      <label><input type="checkbox" id="craftPayCheckbox" onclick="toggleCraftPay()"> Uang Kerajinan 100rb</label>
+      
+    </div>
+
+    <div style="margin:8px 0;">
+      <button onclick="saveAttendance()">Simpan .txt</button>
+      <input type="file" id="uploadTxt" accept=".txt" onchange="loadAttendance(event)">
+    </div>
+
+    <table id="attendanceTable" style="margin-top:12px;">
+      <thead>
+        <tr><th>Tanggal</th><th>Status</th><th>Gaji (Rp)</th></tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr><th colspan="2">Uang Kerajinan</th><th id="tfootCraft">0</th></tr>
+        <tr><th colspan="2">Total Gaji</th><th id="tfootTotal">0</th></tr>
+        <tr><th colspan="2">Total Hari Hadir</th><th id="tfootDays">0</th></tr>
+        <tr><th colspan="2">Total Tidak Hadir</th><th id="tfootAbsent">0</th></tr>
+        <tr><th colspan="2">Total Jam Lembur</th><th id="tfootOvertime">0</th></tr>
+      </tfoot>
+    </table>
+  </div>
+
+<script>
+/* -----------------------
+  KONFIGURASI: masukkan API_KEY di bawah
+   - Buat API key di Google Cloud Console (Calendar API harus di-enable)
+   - Isi string API key ke konstanta berikut:
+------------------------*/
+const API_KEY = "AIzaSyDthcv4JRESSbShy9Zq3c0acFx8L_9HDp4"; // <-- masukkan API key-mu
+const CAL_ID = "id.indonesian%23holiday%40group.v.calendar.google.com";
+
+let attendance = []; // {date:"YYYY-MM-DD", status:"...", salary: number, overtimeHours:number, overtimeAdded:boolean, craftPay:number}
+let holidays = {};   // { "YYYY-MM-DD": "Nama Libur" }
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+
+/* ambil libur nasional via Google Calendar API */
+async function fetchHolidays(){
+  try {
+    if(!API_KEY || API_KEY.trim()===""){ console.warn("API_KEY kosong — kalender libur tidak diambil."); renderCalendar(); return; }
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${CAL_ID}/events?key=${API_KEY}&timeMin=${currentYear}-01-01T00:00:00Z&timeMax=${currentYear}-12-31T23:59:59Z&singleEvents=true&orderBy=startTime`;
+    const res = await fetch(url);
+    const data = await res.json();
+    (data.items||[]).forEach(ev=>{
+      if(ev.start && ev.start.date){
+        holidays[ev.start.date] = ev.summary || "Libur Nasional";
+      }
+    });
+    renderCalendar();
+  } catch(e){
+    console.error("Gagal ambil libur dari Google:", e);
+    renderCalendar();
+  }
+}
+
+/* render kalender bulanan */
+function renderCalendar(){
+  const container = document.getElementById("calendar");
+  container.innerHTML = "";
+  const monthNames = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(currentYear, currentMonth+1, 0).getDate();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+
+  let html = `<h2>${monthNames[currentMonth]} ${currentYear}</h2>`;
+  html += `<table><thead><tr><th>Sen</th><th>Sel</th><th>Rab</th><th>Kam</th><th>Jum</th><th>Sab</th><th>Min</th></tr></thead><tbody><tr>`;
+
+  // firstDay: Sun=0 .. Sat=6; grid expects Mon..Sun so shift
+  let start = (firstDay + 6) % 7; // 0..6 where 0=Mon
+  let dayCount = 0;
+  for(let i=0;i<start;i++){ html += "<td></td>"; dayCount++; }
+
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    let cls = "";
+    let content = d;
+
+    const record = attendance.find(a => a.date === dateStr);
+    if(record){
+      if(record.status === "Hadir (8 Jam)") content = `<span style="color:limegreen;font-weight:700">${d} ✓</span>`;
+      else if(record.status === "Tidak Hadir") content = `<span style="color:#FF4C4C;font-weight:700">${d} ✗</span>`;
+      else if(record.status === "Shift Pagi 12 Jam") {
+  content = `<span style="color:#FF9800;font-weight:700">${d} 🌇 ☑</span>`; // hijau untuk pagi
+}
+else if(record.status === "Shift Malam 12 Jam") {
+  content = `<span style="color:#3F51B5;font-weight:700">${d} 🌃 ☑</span>`; // ungu untuk malam
+}
+    }
+
+    if(holidays[dateStr]) cls = "holiday";
+    const weekday = new Date(currentYear, currentMonth, d).getDay();
+    if(weekday === 0) {
+      if(!cls) cls = "absent-weekend";
+    }
+    if(dateStr === todayStr) cls += " today";
+
+    html += `<td class="${cls}">${content}${holidays[dateStr]?`<br><small>${holidays[dateStr]}</small>`:""}</td>`;
+    dayCount++;
+    if(dayCount % 7 === 0) html += "</tr><tr>";
+  }
+
+  html += "</tr></tbody></table>";
+  container.innerHTML = html;
+}
+
+/* navigasi bulan */
+function changeMonth(offset){
+  currentMonth += offset;
+  if(currentMonth < 0){ currentMonth = 11; currentYear--; }
+  if(currentMonth > 11){ currentMonth = 0; currentYear++; }
+  // re-fetch holidays for the new year if year changed
+  fetchHolidays();
+}
+
+/* menandai absen */
+function markAttendance(mode){
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  if(attendance.find(a => a.date === dateStr)){ alert("Hari ini sudah dicatat!"); return; }
+
+  const day = today.getDay(); // 0=Sun ... 6=Sat
+  let status = "", salary = 0;
+
+  if(mode === "ShiftPagi"){
+    status = "Shift Pagi 12 Jam";
+    salary = 116000;
+  } else if(mode === "ShiftMalam"){
+    status = "Shift Malam 12 Jam";
+    salary = (day === 0 || day === 6 || holidays[dateStr]) ? 121000 : 121000;
+  } else {
+    status = "Hadir (8 Jam)";
+    salary = (day === 0 || day === 6 || holidays[dateStr]) ? 101000 : 80000;
+  }
+
+  attendance.push({date: dateStr, status: status, salary: salary, overtimeHours: 0, overtimeAdded: false, craftPay: 0});
+  updateTable();
+  renderCalendar();
+}
+
+/* tandai tidak hadir */
+function markAbsent(){
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  if(attendance.find(a => a.date === dateStr)){ alert("Hari ini sudah dicatat!"); return; }
+  attendance.push({date: dateStr, status: "Tidak Hadir", salary: 0, overtimeHours: 0, overtimeAdded: false, craftPay: 0});
+  updateTable();
+  renderCalendar();
+}
+
+/* tambah lembur per jam */
+function addOvertime(){
+  const hours = parseFloat(document.getElementById("overtimeInput").value);
+  if(isNaN(hours) || hours <= 0){ alert("Masukkan jam lembur valid!"); return; }
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  const rec = attendance.find(a => a.date === dateStr);
+  if(!rec){ alert("Belum dicatat hari ini!"); return; }
+  if(rec.status === "Tidak Hadir"){ alert("Tidak bisa menambahkan lembur, hari ini tidak hadir!"); return; }
+  if(rec.status === "Shift Pagi 12 Jam" || rec.status === "Shift Malam 12 Jam"){ alert("Tidak bisa menambahkan lembur per jam karena sudah absen Shift 12 Jam!"); return; }
+  if(rec.overtimeAdded){ alert("Lembur sudah dicatat hari ini!"); return; }
+
+  const overtimePay = hours * 12000;
+  rec.salary = (rec.salary || 0) + overtimePay;
+  rec.overtimeHours = hours;
+  rec.overtimeAdded = true;
+  updateTable();
+  alert(`Lembur ${hours} jam berhasil ditambahkan. Tambahan gaji Rp ${overtimePay.toLocaleString("id-ID")}`);
+  document.getElementById("overtimeInput").value = "";
+}
+
+/* update state checkbox uang kerajinan & footer */
+function updateCraftPayCheckbox(){
+  const cb = document.getElementById("craftPayCheckbox");
+  const today = new Date();
+  const cm = today.getMonth(), cy = today.getFullYear();
+
+  const monthRecords = attendance.filter(a => {
+    const d = new Date(a.date);
+    return d.getMonth() === cm && d.getFullYear() === cy;
+  });
+
+  const anyAbsent = monthRecords.some(a => a.status === "Tidak Hadir");
+  const hadirKeywords = ["Hadir (8 Jam)", "Shift Pagi 12 Jam", "Shift Malam 12 Jam"];
+  const anyHadir = monthRecords.some(a => hadirKeywords.includes(a.status));
+
+  if(anyAbsent || !anyHadir){
+    cb.disabled = true;
+    cb.checked = false;
+  } else {
+    cb.disabled = false;
+    cb.checked = monthRecords.some(a => (a.craftPay || 0) > 0);
+  }
+}
+
+/* toggle craft pay (sekali per bulan ke record hadir pertama) */
+function toggleCraftPay(){
+  const cb = document.getElementById("craftPayCheckbox");
+  const today = new Date();
+  const cm = today.getMonth(), cy = today.getFullYear();
+  const hadirKeywords = ["Hadir (8 Jam)", "Shift Pagi 12 Jam", "Shift Malam 12 Jam"];
+
+  const hadirRecords = attendance.filter(a => {
+    const d = new Date(a.date);
+    return d.getMonth() === cm && d.getFullYear() === cy && hadirKeywords.includes(a.status);
+  });
+
+  if(cb.checked){
+    const already = hadirRecords.some(a => (a.craftPay || 0) > 0);
+    if(!already && hadirRecords.length > 0){
+      hadirRecords[0].craftPay = 100000;
+    }
+  } else {
+    attendance.forEach(a => {
+      const d = new Date(a.date);
+      if(d.getMonth() === cm && d.getFullYear() === cy) a.craftPay = 0;
+    });
+  }
+  updateTable();
+}
+
+/* update tabel & footer */
+function updateTable(){
+  const tbody = document.querySelector("#attendanceTable tbody");
+  tbody.innerHTML = "";
+  let totalGaji = 0, totalOvertime = 0, totalAbsent = 0, totalCraftPay = 0;
+
+  attendance.forEach(a => {
+    const rowDate = a.date || "";
+    const holidayText = holidays[rowDate] ? ` (${holidays[rowDate]})` : "";
+    tbody.innerHTML += `<tr>
+      <td>${formatTanggal(rowDate)}${holidayText}</td>
+      <td>${a.status}</td>
+      <td>${(a.salary || 0).toLocaleString("id-ID")}</td>
+    </tr>`;
+    totalGaji += (a.salary || 0);
+    totalOvertime += (a.overtimeHours || 0);
+    totalCraftPay += (a.craftPay || 0);
+    if(a.status === "Tidak Hadir") totalAbsent++;
+  });
+
+  document.getElementById("tfootCraft").innerText = totalCraftPay.toLocaleString("id-ID");
+  document.getElementById("tfootTotal").innerText = (totalGaji + totalCraftPay).toLocaleString("id-ID");
+  document.getElementById("tfootDays").innerText = attendance.filter(a => a.status !== "Tidak Hadir").length;
+  document.getElementById("tfootAbsent").innerText = totalAbsent;
+  document.getElementById("tfootOvertime").innerText = totalOvertime;
+
+  updateCraftPayCheckbox();
+}
+
+/* simpan attendance ke file .txt */
+function saveAttendance(){
+  if(attendance.length === 0){ alert("Belum ada data absensi untuk disimpan!"); return; }
+  const lines = attendance.map(a => `${a.date},${a.status},${a.salary||0},${a.overtimeHours||0},${a.craftPay||0}`);
+  const blob = new Blob([lines.join("\n")], {type: "text/plain"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "absensi.txt";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* load attendance dari file .txt */
+function loadAttendance(event){
+  const file = event.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const lines = e.target.result.split("\n").map(l => l.trim()).filter(l => l.length>0);
+    attendance = lines.map(line => {
+      const parts = line.split(",");
+      const date = parts[0] || "";
+      const status = parts[1] || "";
+      let salary = parseInt(parts[2]) || 0;
+      const overtimeHours = parseFloat(parts[3]) || 0;
+      const craftPay = parseInt(parts[4]) || 0;
+      // Jika file lama menyertakan craftPay dalam salary, hindari double-count:
+      if(craftPay > 0 && salary >= craftPay){
+        salary = salary - craftPay;
+      }
+      return {date, status, salary, overtimeHours, overtimeAdded: overtimeHours>0, craftPay};
+    }).filter(a => a.date);
+    updateTable();
+    renderCalendar();
+    alert("File absensi berhasil dimuat.");
+  };
+  reader.readAsText(file);
+}
+
+/* helper format tanggal human readable */
+function formatTanggal(dateStr){
+  if(!dateStr) return "";
+  const [yyyy,mm,dd] = dateStr.split("-");
+  const months = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  return `${parseInt(dd)} ${months[parseInt(mm,10)-1]} ${yyyy}`;
+}
+
+/* inisialisasi: ambil libur & render */
+fetchHolidays();
+renderCalendar();
+</script>
+</body>
+</html>
