@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Kalkulator Gaji - Final (Fixed)</title>
+<style>
+  body { font-family: Arial, sans-serif; margin:20px; background:#f5f7fb; }
+  .container { max-width:780px; margin:auto; background:white; padding:18px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.08); }
+  h2 { text-align:center; margin:0 0 12px; }
+  label { display:block; margin-top:10px; font-size:14px; color:#333; }
+  input[type="text"], input[type="number"] { width:100%; padding:8px; margin-top:6px; box-sizing:border-box; border:1px solid #ddd; border-radius:6px; }
+  .result { margin-top:16px; font-size:14px; line-height:1.5; background:#fafafa; padding:12px; border-radius:8px; border:1px solid #eee; min-height:56px; }
+  .legend { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+  .legend span { font-size:13px; padding:6px 10px; border-radius:6px; color:white; }
+  .lg-hari{ background:#4caf50 } .lg-hari12{ background:#ff9800 } .lg-hari12malam{ background:#3f51b5 } .lg-lembur{ background:#1976d2 }
+  .btn { display:block; width:100%; padding:10px; border-radius:8px; border:none; cursor:pointer; font-size:15px; margin-top:10px; }
+  .download-btn { background:#1976d2; color:white; }
+  .reset-btn { background:#efefef; color:#333; }
+  .calendar-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; z-index:9999; }
+  .calendar { background:white; padding:14px; border-radius:10px; width:560px; max-width:96%; box-shadow:0 8px 30px rgba(0,0,0,0.12); }
+  .calendar-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .calendar-days { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .day-name { font-weight:700; text-align:center; font-size:13px; color:#444; padding:6px 0; }
+  .day { padding:8px; text-align:center; border-radius:6px; cursor:pointer; user-select:none; border:1px solid transparent; min-height:36px; display:flex; align-items:center; justify-content:center; }
+  .day:hover { background:#f1f1f1; }
+  .selected-hari { background:#4caf50; color:white; }
+  .selected-hari12 { background:#ff9800; color:white; }
+  .selected-hari12malam { background:#3f51b5; color:white; }
+  .selected-lembur { background:#1976d2; color:white; }
+  .holiday { color:#d32f2f; font-weight:700; }
+  #holidayNotes { margin-top:8px; font-size:13px; color:#d32f2f; }
+
+  /* export calendar styling */
+  table.export-cal {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 10px;
+    font-size: 13px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  table.export-cal th {
+    background: #1976d2;
+    color: white;
+    font-weight: 600;
+    padding: 8px;
+    text-align: center;
+  }
+  table.export-cal td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+    vertical-align: middle;
+    min-width: 36px;
+    height: 42px;
+    background: #fff;
+  }
+  table.export-cal td.holiday {
+    background: #ffecec !important;
+    color: #d32f2f !important;
+    font-weight: bold;
+  }
+
+  @media print {
+    .btn, input, .container { -webkit-print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h2>Kalkulator Gaji</h2>
+
+    <label>Kerja 8 Jam (Rp80.000/hari)</label>
+    <input type="text" id="hari" readonly placeholder="Klik untuk pilih di kalender">
+
+    <label>Kerja Lembur 8 Jam (Rp101.000/hari)</label>
+    <input type="text" id="lembur" readonly placeholder="Klik untuk pilih di kalender">
+
+    <label>Kerja 12 Jam - Shift Pagi (Rp116.000/hari)</label>
+    <input type="text" id="hari12" readonly placeholder="Klik untuk pilih di kalender">
+
+    <label>Kerja 12 Jam - Shift Malam (Rp121.000/hari)</label>
+    <input type="text" id="hari12Malam" readonly placeholder="Klik untuk pilih di kalender">
+
+    <label>Jumlah Jam Lembur (Rp12.000/jam)</label>
+    <input type="number" id="jam" value="0" min="0">
+
+    <label style="margin-top:10px"><input type="checkbox" id="bonus"> &nbsp;Tidak ada sakit/izin (Uang Kerajinan Rp100.000)</label>
+
+    <label>Bonus Mister (nominal)</label>
+    <input type="text" id="bonusMister" placeholder="Masukkan nominal (angka saja)">
+
+    <div class="result" id="rincian"></div>
+
+    <div class="legend" aria-hidden="true">
+      <span class="lg-hari">8 Jam</span>
+      <span class="lg-hari12">12 Jam Pagi</span>
+      <span class="lg-hari12malam">12 Jam Malam</span>
+      <span class="lg-lembur">Lembur 8 Jam</span>
+    </div>
+
+    <button class="btn download-btn" id="downloadBtn">📥 Unduh Slip (PDF)</button>
+    <button class="btn download-btn" id="downloadPngBtn">📥 Unduh Slip (PNG)</button>
+    <button class="btn download-btn" id="backupBtn">💾 Backup (.txt)</button>
+    <input type="file" id="restoreFile" accept=".txt" style="display:none" />
+    <button class="btn download-btn" id="restoreBtn">📤 Pulihkan (.txt)</button>
+    <button class="btn reset-btn" id="resetBtn">🔄 Reset</button>
+  </div>
+
+  <div id="exportArea" style="display:none; padding:18px; background:white; width:760px; max-width:96%; margin:12px auto; border-radius:8px;"></div>
+
+  <div class="calendar-modal" id="modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="calendar" role="document">
+      <div class="calendar-header">
+        <button id="prev" aria-label="prev">&lt;</button>
+        <strong id="monthYear"></strong>
+        <button id="next" aria-label="next">&gt;</button>
+      </div>
+      <div class="calendar-days" id="calDays"></div>
+      <div id="holidayNotes"></div>
+      <div style="text-align:right;margin-top:10px;">
+        <button id="closeBtn" class="btn reset-btn" style="width:auto;padding:8px 12px">Batal</button>
+        <button id="okBtn" class="btn" style="width:auto;padding:8px 12px;background:#4caf50;color:#fff">OK</button>
+      </div>
+    </div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+/* Full working JS - integrated, robust, no placeholders */
+
+// --- state & elements
+let selectedHari = new Set();
+let selectedHari12 = new Set();
+let selectedHari12Malam = new Set();
+let selectedLembur = new Set();
+let holidays = {};
+
+let activeInput = null;
+let activeSet = null;
+let calMonth = new Date().getMonth();
+let calYear = new Date().getFullYear();
+
+const dayNames = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'];
+const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+const elHari = document.getElementById('hari');
+const elHari12 = document.getElementById('hari12');
+const elHari12Malam = document.getElementById('hari12Malam');
+const elLembur = document.getElementById('lembur');
+const elJam = document.getElementById('jam');
+const elBonus = document.getElementById('bonus');
+const elBonusMister = document.getElementById('bonusMister');
+const rincian = document.getElementById('rincian');
+const modal = document.getElementById('modal');
+const calDays = document.getElementById('calDays');
+const calTitle = document.getElementById('monthYear');
+const prevBtn = document.getElementById('prev');
+const nextBtn = document.getElementById('next');
+const okBtn = document.getElementById('okBtn');
+const closeBtn = document.getElementById('closeBtn');
+const resetBtn = document.getElementById('resetBtn');
+const exportArea = document.getElementById('exportArea');
+const restoreFile = document.getElementById('restoreFile');
+
+// --- load national holidays (Google Calendar public ID)
+async function loadHolidaysFromGoogle(year = calYear, month = calMonth){
+  const timeMin = new Date(year, month, 1).toISOString();
+  const timeMax = new Date(year, month+1, 0, 23,59,59).toISOString();
+  const key = 'AIzaSyDthcv4JRESSbShy9Zq3c0acFx8L_9HDp4'; // public calendar key used earlier
+  const url = 'https://www.googleapis.com/calendar/v3/calendars/id.indonesian%23holiday@group.v.calendar.google.com/events' +
+              '?key=' + key +
+              '&timeMin=' + encodeURIComponent(timeMin) +
+              '&timeMax=' + encodeURIComponent(timeMax);
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    holidays = {};
+    if (data && data.items) {
+      data.items.forEach(ev => {
+        if (ev.start && ev.start.date) holidays[ev.start.date] = ev.summary || '';
+      });
+    }
+  } catch (err) {
+    console.warn('loadHolidaysFromGoogle failed', err);
+    holidays = {};
+  }
+}
+
+// --- build interactive calendar (modal)
+async function buildCalendar(){
+  await loadHolidaysFromGoogle(calYear, calMonth);
+  calDays.innerHTML = '';
+  calTitle.textContent = monthNames[calMonth] + ' ' + calYear;
+
+  // headers
+  dayNames.forEach(d => {
+    const h = document.createElement('div');
+    h.className = 'day-name';
+    h.textContent = d;
+    calDays.appendChild(h);
+  });
+
+  const first = new Date(calYear, calMonth, 1);
+  const last = new Date(calYear, calMonth+1, 0);
+  const start = (first.getDay() + 6) % 7; // Monday-first
+  for (let i=0;i<start;i++) calDays.appendChild(document.createElement('div'));
+
+  const holidayList = [];
+
+  for (let d=1; d<=last.getDate(); d++){
+    const div = document.createElement('div');
+    div.className = 'day';
+    div.textContent = d;
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isHoliday = !!holidays[dateStr];
+
+    if (selectedHari.has(dateStr)) div.classList.add('selected-hari');
+    if (selectedHari12.has(dateStr)) div.classList.add('selected-hari12');
+    if (selectedHari12Malam.has(dateStr)) div.classList.add('selected-hari12malam');
+    if (selectedLembur.has(dateStr)) div.classList.add('selected-lembur');
+    if (isHoliday) { div.classList.add('holiday'); holidayList.push(`${d} ${monthNames[calMonth]}: ${holidays[dateStr]}`); }
+
+    div.addEventListener('click', () => {
+      if (!activeSet) return; // only select when modal is open via an input
+      // ensure each date exists in at most one set: remove from others
+      if (activeSet.has(dateStr)) {
+        activeSet.delete(dateStr);
+      } else {
+        // remove from other sets
+        selectedHari.delete(dateStr);
+        selectedHari12.delete(dateStr);
+        selectedHari12Malam.delete(dateStr);
+        selectedLembur.delete(dateStr);
+        activeSet.add(dateStr);
+      }
+      saveCache();
+      buildCalendar();
+    });
+
+    calDays.appendChild(div);
+  }
+
+  const notes = document.getElementById('holidayNotes');
+  if (holidayList.length) {
+    notes.innerHTML = "<b>Libur Nasional Bulan Ini:</b><ul style='margin:6px 0 0 18px;padding:0;'>" + holidayList.map(it=>`<li>${it}</li>`).join('') + "</ul>";
+  } else notes.innerHTML = "";
+}
+
+// --- calculation
+function hitung(){
+  const h = selectedHari.size;
+  const h12 = selectedHari12.size;
+  const h12M = selectedHari12Malam.size;
+  const l = selectedLembur.size;
+  const j = parseInt(elJam.value) || 0;
+  const b = elBonus.checked ? 100000 : 0;
+  const bonusM = parseInt(elBonusMister.value.replace(/\D/g,'')) || 0;
+
+  const gajiHari = h * 80000;
+  const gajiHari12 = h12 * 116000;
+  const gajiHari12M = h12M * 121000;
+  const gajiLembur = l * 101000;
+  const gajiJam = j * 12000;
+  const total = gajiHari + gajiHari12 + gajiHari12M + gajiLembur + gajiJam + b + bonusM;
+
+  rincian.innerHTML = `
+    <div>Kerja 8 Jam (${h} hari): Rp${gajiHari.toLocaleString('id-ID')}</div>
+    <div>12 Jam Pagi (${h12} hari): Rp${gajiHari12.toLocaleString('id-ID')}</div>
+    <div>12 Jam Malam (${h12M} hari): Rp${gajiHari12M.toLocaleString('id-ID')}</div>
+    <div>Lembur 8 Jam (${l} hari): Rp${gajiLembur.toLocaleString('id-ID')}</div>
+    <div>Lembur per jam (${j} jam): Rp${gajiJam.toLocaleString('id-ID')}</div>
+    <div>Uang Kerajinan: Rp${b.toLocaleString('id-ID')}</div>
+    <div>Bonus Mister: Rp${bonusM.toLocaleString('id-ID')}</div>
+    <hr/>
+    <div><strong>Total Gaji: Rp${total.toLocaleString('id-ID')}</strong></div>
+  `;
+}
+
+// --- events
+[elHari, elHari12, elHari12Malam, elLembur].forEach(el => {
+  el.addEventListener('click', () => {
+    activeInput = el;
+    activeSet = (el === elHari ? selectedHari : el === elHari12 ? selectedHari12 : el === elHari12Malam ? selectedHari12Malam : selectedLembur);
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden','false');
+    buildCalendar();
+  });
+});
+
+[elJam, elBonus].forEach(e => e.addEventListener('input', () => { hitung(); saveCache(); }));
+elBonusMister.addEventListener('input', () => { elBonusMister.value = elBonusMister.value.replace(/\D/g,''); hitung(); saveCache(); });
+
+okBtn.addEventListener('click', () => {
+  if (activeInput && activeSet) {
+    activeInput.value = activeSet.size ? (activeSet.size + ' Hari') : '';
+    hitung(); saveCache();
+  }
+  modal.style.display = 'none';
+  modal.setAttribute('aria-hidden','true');
+  activeInput = null;
+  activeSet = null;
+});
+closeBtn.addEventListener('click', () => {
+  modal.style.display = 'none';
+  modal.setAttribute('aria-hidden','true');
+  activeInput = null;
+  activeSet = null;
+});
+prevBtn.addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } buildCalendar(); });
+nextBtn.addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } buildCalendar(); });
+
+// --- backup / restore / cache
+function getDataObj(){
+  return {
+    hari: [...selectedHari],
+    hari12: [...selectedHari12],
+    hari12Malam: [...selectedHari12Malam],
+    lembur: [...selectedLembur],
+    jam: elJam.value,
+    bonus: elBonus.checked,
+    bonusMister: elBonusMister.value
+  };
+}
+function applyDataObj(d){
+  selectedHari = new Set(d.hari || []);
+  selectedHari12 = new Set(d.hari12 || []);
+  selectedHari12Malam = new Set(d.hari12Malam || []);
+  selectedLembur = new Set(d.lembur || []);
+  elJam.value = d.jam || 0;
+  elBonus.checked = !!d.bonus;
+  elBonusMister.value = d.bonusMister || '';
+  elHari.value = selectedHari.size ? (selectedHari.size + ' Hari') : '';
+  elHari12.value = selectedHari12.size ? (selectedHari12.size + ' Hari') : '';
+  elHari12Malam.value = selectedHari12Malam.size ? (selectedHari12Malam.size + ' Hari') : '';
+  elLembur.value = selectedLembur.size ? (selectedLembur.size + ' Hari') : '';
+  hitung();
+  buildCalendar();
+}
+function saveCache(){ try { localStorage.setItem('gajiCache', JSON.stringify(getDataObj())); } catch(e){} }
+function loadCache(){ try { const c = localStorage.getItem('gajiCache'); if (c) applyDataObj(JSON.parse(c)); } catch(e){} }
+
+document.getElementById('backupBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(getDataObj(), null, 2)], { type: 'text/plain' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'backup-gaji.txt';
+  link.click();
+});
+
+document.getElementById('restoreBtn').addEventListener('click', () => restoreFile.click());
+restoreFile.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      applyDataObj(data);
+      saveCache();
+      alert('✅ Data berhasil dipulihkan');
+    } catch (err) {
+      alert('❌ File tidak valid');
+    }
+    // reset input so same file can be selected again
+    restoreFile.value = '';
+  };
+  reader.readAsText(file);
+});
+
+resetBtn.addEventListener('click', () => {
+  selectedHari.clear(); selectedHari12.clear(); selectedHari12Malam.clear(); selectedLembur.clear();
+  elHari.value = ''; elHari12.value = ''; elHari12Malam.value = ''; elLembur.value = '';
+  elJam.value = 0; elBonus.checked = false; elBonusMister.value = '';
+  rincian.innerHTML = '';
+  try { localStorage.removeItem('gajiCache'); } catch(e){}
+  buildCalendar();
+  hitung();
+});
+
+// --- render export area
+function renderExportArea(){
+  // ensure holidays for current month are loaded (use same calMonth/calYear)
+  // loadHolidaysFromGoogle is synchronous-ish earlier; assume already loaded by buildCalendar
+  exportArea.style.display = 'block';
+  exportArea.innerHTML = '';
+
+  // title
+  const title = document.createElement('h3');
+  title.textContent = monthNames[calMonth] + ' ' + calYear;
+  exportArea.appendChild(title);
+
+  // calendar table
+  const table = document.createElement('table');
+  table.className = 'export-cal';
+  const header = document.createElement('tr');
+  dayNames.forEach(d => {
+    const th = document.createElement('th');
+    th.textContent = d;
+    header.appendChild(th);
+  });
+  table.appendChild(header);
+
+  const first = new Date(calYear, calMonth, 1);
+  const last = new Date(calYear, calMonth+1, 0);
+  const start = (first.getDay() + 6) % 7;
+
+  let row = document.createElement('tr');
+  for (let i=0;i<start;i++) row.appendChild(document.createElement('td'));
+
+  for (let d=1; d<=last.getDate(); d++){
+    const td = document.createElement('td');
+    td.textContent = d;
+    td.style.minWidth = '32px';
+    td.style.height = '40px';
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+    if (selectedHari.has(dateStr)) td.style.background = '#4caf50';
+    if (selectedHari12.has(dateStr)) td.style.background = '#ff9800';
+    if (selectedHari12Malam.has(dateStr)) td.style.background = '#3f51b5';
+    if (selectedLembur.has(dateStr)) td.style.background = '#1976d2';
+
+    if (holidays[dateStr]) { td.classList.add('holiday'); td.title = holidays[dateStr]; }
+
+    row.appendChild(td);
+    if ((start + d - 1) % 7 === 6) {
+      table.appendChild(row);
+      row = document.createElement('tr');
+    }
+  }
+  if (row.children.length) table.appendChild(row);
+  exportArea.appendChild(table);
+
+  // holidays list
+  const holidayEntries = Object.entries(holidays);
+  if (holidayEntries.length) {
+    const notes = document.createElement('div');
+    notes.style.marginTop = '10px';
+    notes.innerHTML = '<b>Libur Nasional:</b><ul style="margin:6px 0 0 18px;padding:0;">' +
+      holidayEntries.map(([date,name]) => {
+        const dt = new Date(date);
+        return `<li>${dt.getDate()} ${monthNames[dt.getMonth()]}: ${name}</li>`;
+      }).join('') + '</ul>';
+    exportArea.appendChild(notes);
+  }
+
+  // legend
+  const legend = document.createElement('div');
+  legend.style.marginTop = '10px';
+  legend.innerHTML = `
+    <span style="background:#4caf50;color:white;padding:4px 8px;border-radius:4px;font-size:12px;">8 Jam</span>
+    <span style="background:#ff9800;color:white;padding:4px 8px;border-radius:4px;font-size:12px;margin-left:8px;">12 Jam Pagi</span>
+    <span style="background:#3f51b5;color:white;padding:4px 8px;border-radius:4px;font-size:12px;margin-left:8px;">12 Jam Malam</span>
+    <span style="background:#1976d2;color:white;padding:4px 8px;border-radius:4px;font-size:12px;margin-left:8px;">Lembur</span>
+  `;
+  exportArea.appendChild(legend);
+
+  // rincian copy
+  const rincianCopy = document.createElement('div');
+  rincianCopy.style.marginTop = '14px';
+  rincianCopy.innerHTML = rincian.innerHTML;
+  exportArea.appendChild(rincianCopy);
+}
+
+// --- download handlers
+document.getElementById('downloadPngBtn').addEventListener('click', () => {
+  renderExportArea();
+  const exp = exportArea;
+  setTimeout(() => {
+    html2canvas(exp, { scale: 2 }).then(canvas => {
+      exp.style.display = 'none';
+      const link = document.createElement('a');
+      link.download = 'Slip-Gaji.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }).catch(err => {
+      exp.style.display = 'none';
+      console.error('html2canvas error:', err);
+      alert('Gagal membuat PNG. Buka console untuk detail.');
+    });
+  }, 160);
+});
+
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  renderExportArea();
+  const exp = exportArea;
+  setTimeout(() => {
+    html2canvas(exp, { scale: 2 }).then(canvas => {
+      const { jsPDF } = window.jspdf;
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p','mm','a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const imgWidth = pageWidth;
+      const imgHeight = canvas.height * imgWidth / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 8, imgWidth, imgHeight);
+      exp.style.display = 'none';
+      pdf.save('Slip-Gaji.pdf');
+    }).catch(err => {
+      exp.style.display = 'none';
+      console.error('html2canvas error:', err);
+      alert('Gagal membuat PDF. Buka console untuk detail.');
+    });
+  }, 200);
+});
+
+// --- init
+loadCache();
+buildCalendar();
+hitung();
+</script>
+</body>
+</html>
